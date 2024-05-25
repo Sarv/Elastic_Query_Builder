@@ -276,15 +276,21 @@ Date fields can support various formats as values in the query string. The proje
 #### Supported Formats
 
 1. **Exact Date** : A specific date and time.
+   
 --- `Format` : **YYYY-MM-DD HH:mm:ss.SSS**
+
 --- `Example` : **"2024-05-13 12:00:00.432"**
 
-2. **Relative Date** : Relative to the current date and time.
+3. **Relative Date** : Relative to the current date and time.
+
 --- `Format` : **now**, **today**, **now-2h**, **today+2d**, etc.
+
 --- `Example` : **"now-2h"** (2 hours ago from now)
 
-3. **Time Zone Support** : Adjusts dates based on the specified time zone.
+4. **Time Zone Support** : Adjusts dates based on the specified time zone.
+
 --- `Format` : **+05:30**, **-02:00**, etc.
+
 --- `Example` : **"2024-05-13 12:00:00.432+05:30"**
 
 #### Example
