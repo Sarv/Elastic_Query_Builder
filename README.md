@@ -539,6 +539,8 @@ Nested fields are fields that are objects containing other fields. To query nest
 
 ## Aggregation Query
 
+Our Elastic Query Builder library supports a comprehensive range of aggregations to meet diverse data analysis needs. The supported aggregations include statistical measures such as `avg`, `sum`, `min`, `max`, `stats`, and `extended_stats`, providing detailed insights into your data. Additionally, the library supports `value_count` for counting occurrences, `percentiles` for distribution analysis, and `cardinality` for unique count estimation. For categorical data analysis, `terms` aggregation is available, and time-based data can be effectively analyzed using `date_histogram`. Moreover, our library handles complex data structures with `nested` aggregation, ensuring versatile and powerful data aggregation capabilities.
+
 #### Query String
 
     'profession.status = "active" and createDate >= "today-2d"'
