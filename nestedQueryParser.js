@@ -260,17 +260,36 @@ function jsonToESQuery(parsedJSON, queryType, aggregationType = null, aggregatio
 
     const isAllowed = isAggregationAllowed(aggregationField, aggregationType);
     if (isAllowed === true) {
-      return {
-        query: esQuery,
-        aggs: {
-          agg_name: {
-            [aggregationType]: {
-              field: aggregationField,
-              fixed_interval: fixedInterval
-            }
-          }
-        }
-      };
+      if(aggregationType === 'date_histogram')
+      {
+          return {
+            query: esQuery,
+            aggs: {
+              agg_name: {
+                [aggregationType]: {
+                  field: aggregationField,
+                  fixed_interval: fixedInterval
+                }
+              }
+            },
+            size: size
+          };
+      }
+      else 
+      {
+          return {
+            query: esQuery,
+            aggs: {
+              agg_name: {
+                [aggregationType]: {
+                  field: aggregationField
+                }
+              }
+            },
+            size: size
+          };
+      }
+      
     } else {
       return isAllowed;
     }
