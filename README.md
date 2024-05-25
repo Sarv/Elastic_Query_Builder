@@ -6,7 +6,7 @@
 
 The Elasticsearch Query Builder project is designed to convert a string input into a valid Elasticsearch (ES) query. It handles various query types like search, count, and aggregation, and supports nested fields, date manipulations, and validation against an Elasticsearch mapping. The project consists of multiple JavaScript files, each serving a specific purpose.
 
-![ElasticSearch Query Builder Flow](https://github.com/abhimanyu1310/Elastic_queryParser/blob/d726d0e07f457bc3ef56e0d61fedaee5d02a3b3c/Elastic_Query_Builder.png)
+![ElasticSearch Query Builder Flow](https://github.com/Sarv/Elastic_Query_Builder/blob/a8ef43d48031b112e117ca6e0b6825256ef41704/Elastic_Query_Builder.png)
 
 ## Project Structure
 ```
@@ -295,7 +295,7 @@ Query String:
 Time Zone:
 
 ```javascript
-  const timeZone = '+05:30';
+	const timeZone = '+05:30';
 ```
 
 Resulting Elasticsearch Query:
