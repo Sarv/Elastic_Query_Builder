@@ -1,0 +1,111 @@
+{
+  "YOUR_ELASTIC_INDEX": {
+    "mappings": {
+      "properties": {
+        "mobile": {
+          "type": "keyword"
+        },
+        "name": {
+          "type": "keyword"
+        },
+        "gender": {
+          "type": "keyword"
+        },
+        "age": {
+          "type": "short"
+        },
+        "createDate": {
+          "type": "date"
+        },
+        "activityLog": {
+          "type": "object",
+          "enabled": false
+        },
+        "parentHierarchy": {
+          "type": "keyword",
+          "index" : false
+        },
+        "profession": {
+          "type": "nested",
+          "properties": {
+            "company": {
+              "type": "keyword"
+            },
+            "salary": {
+              "type": "long"
+            },
+            "jobTitle": {
+              "type": "keyword"
+            },
+            "companyContact": {
+              "type": "keyword"
+            },
+            "profile": {
+              "type": "keyword"
+            },
+            "empCode": {
+              "type": "short"
+            },
+            "joiningDate": {
+              "type": "date"
+            },
+            "exitDate": {
+              "type": "date"
+            },
+            "status": {
+              "type": "keyword"
+            },
+            "duration": {
+              "type": "short"
+            },
+            "role": {
+              "type": "keyword"
+            }
+          }
+        },
+        "address": {
+          "type": "nested",
+          "properties": {
+            "country": {
+              "type": "keyword"
+            },
+            "state": {
+              "type": "keyword"
+            },
+            "district": {
+              "type": "keyword"
+            },
+            "city": {
+              "type": "keyword"
+            },
+            "town": {
+              "type": "keyword"
+            },
+            "area": {
+              "type": "keyword"
+            },
+            "lane": {
+              "type": "keyword"
+            },
+            "floor": {
+              "type": "short"
+            },
+            "flatNo": {
+              "type": "short"
+            },
+            "pincode": {
+              "type": "long"
+            },
+            "houseNo": {
+              "type": "short"
+            }
+          }
+        },
+        "durations": {
+          "type": "long",
+          "index": true
+        }
+      }
+    }
+  }
+}
