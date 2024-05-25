@@ -15,6 +15,7 @@ const fieldTypes = {
   boolean: ['=', '!=']
 };
 
+
 // Define allowed field types for each aggregation type
 const aggregationFieldTypeMapping = {
   avg: ['long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float'],
@@ -25,18 +26,18 @@ const aggregationFieldTypeMapping = {
   extended_stats: ['long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float'],
   value_count: ['keyword', 'text', 'long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float', 'date', 'boolean'],
   percentiles: ['long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float'],
-  percentiles_ranks: ['long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float'],
+  //percentile_ranks: ['long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float'],
   cardinality: ['keyword', 'text', 'long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float', 'date', 'boolean'],
-  terms: ['keyword', 'numeric', 'boolean', 'date', 'ip', 'geo_point', 'geo_shape'],
-  range: ['numeric', 'date', 'ip'],
-  date_range: ['date'],
-  ip_range: ['ip'],
-  histogram: ['numeric'],
+  terms: ['keyword', 'text', 'long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float', 'date', 'boolean'],
+  //range: ['long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float', 'date'],
+  //date_range: ['date'],
+  //ip_range: ['ip'],
+  //histogram: ['long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float'],
   date_histogram: ['date'],
-  geo_distance: ['geo_point'],
+  //geo_distance: ['geo_point'],
   nested: ['nested'],
-  reverse_nested: ['nested'],
-  filters: ['keyword', 'numeric', 'boolean', 'date', 'ip', 'geo_point', 'geo_shape']
+  //reverse_nested: ['nested'],
+  //filters: ['keyword', 'text', 'long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float', 'date', 'boolean']
 };
 
 /**
@@ -62,7 +63,7 @@ function validateFixedInterval(interval) {
  * @returns {object|null} - An error object if validation fails, otherwise null.
  */
 function validateSize(size) {
-  if (!Number.isInteger(size) || size <= 0) {
+  if (!Number.isInteger(size) || size < 0) {
     return { errorCode: 'INVALID_SIZE', message: 'Size must be a positive integer.' };
   }
   return null;
