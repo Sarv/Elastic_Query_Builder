@@ -175,8 +175,8 @@ The `mappingUtils.js` file contains functions for loading and processing the map
  1. **Clone the Repository**
 
 ```console
- git clone https://github.com/yourusername/es-query-Builder.git
- cd es-query-Builder
+ git clone https://github.com/Sarv/Elastic_Query_Builder.git
+ cd Elastic_Query_Builder
 ```
 
  2. **Install Dependencies**
