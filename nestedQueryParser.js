@@ -1,5 +1,5 @@
-const { parseRelativeDate, formatDateString } = require('./utils/dateUtils');
-const { validOperators, fieldTypes, validateFixedInterval, validateSize, tokenize, aggregationFieldTypeMapping } = require('./utils/queryUtils');
+const { parseRelativeDate, formatDateString, validateTimeZone } = require('./utils/dateUtils');
+const { validOperators, fieldTypes, validateFixedInterval, validateSize,validateHistoInterval,  tokenize, aggregationFieldTypeMapping, validateOptions } = require('./utils/queryUtils');
 const { loadMapping } = require('./utils/mappingUtils');
 
 // Load the fields and indexed fields from the mapping
@@ -21,6 +21,11 @@ indexedFields = indexed;
 function parseQuery(tokens, timeZone = 'Z') {
   const logicalGates = ['and', 'or'];
 
+  const timeZoneValidate = validateTimeZone(timeZone);
+          if (timeZoneValidate.errorCode) {
+            return timeZoneValidate; // Return error if timeZone is invalid
+          }
+
   /**
    * Recursively parses the tokens into a nested expression tree.
    * 
@@ -29,6 +34,7 @@ function parseQuery(tokens, timeZone = 'Z') {
    * @returns {object} - The parsed nested expression or an error object.
    */
   function parseExpression(tokens, parentLogicGate = 'and') {
+
     const expression = { conditions: [], logicGate: parentLogicGate };
     let currentKey = null;
     let currentOperator = null;
@@ -125,18 +131,23 @@ function parseQuery(tokens, timeZone = 'Z') {
 }
 
 /**
- * Converts the parsed JSON expression tree into an Elasticsearch query.
- * Supports different query types like search, count, and aggregation.
+ * Converts the parsed query JSON to an Elasticsearch query.
+ * Handles conditions, aggregations, and options such as size and timeZone.
  *
- * @param {object} parsedJSON - The parsed JSON expression tree.
- * @param {string} queryType - The type of query (e.g., 'search', 'count', 'aggregation').
- * @param {string|null} aggregationType - The type of aggregation (e.g., 'avg', 'sum').
- * @param {string|null} aggregationField - The field to aggregate on.
- * @param {string} fixedInterval - The fixed interval for date histogram (e.g., '1d').
- * @param {number} size - The size parameter for search queries.
- * @returns {object} - The Elasticsearch query object or an error object.
+ * @param {object} parsedQuery - The parsed query JSON structure.
+ * @param {object} options - Query options including queryType, aggregationType, aggregationField, fixed_interval, size, and timeZone, interval, etc.
+ * @returns {object} - The Elasticsearch query object.
  */
-function jsonToESQuery(parsedJSON, queryType, aggregationType = null, aggregationField = null, fixedInterval = '1d', size = 10) {
+
+function jsonToESQuery(parsedJSON, options) {
+  const queryType = ('queryType' in options ) ? options['queryType'] : "search";
+  const aggregationType = ('aggregationType' in options ) ? options['aggregationType'] : null;
+  const aggregationField = ('aggregationField' in options ) ? options['aggregationField'] : null;
+  const fixedInterval = ('fixed_interval' in options ) ? options['fixed_interval'] : "1d";
+  const size = ('size' in options ) ? parseInt(options['size'],10) : 10;
+  const histo_interval = ('interval' in options ) ? parseInt(options['interval'],10) : 10;
+
+
   // Check if there is an error in the parsed JSON
   if (parsedJSON.errorCode) {
     return parsedJSON;
@@ -152,6 +163,12 @@ function jsonToESQuery(parsedJSON, queryType, aggregationType = null, aggregatio
   const sizeError = validateSize(size);
   if (sizeError) {
     return sizeError;
+  }
+
+  // Validate the histo_interval parameter
+  const histo_intervalError = validateHistoInterval(histo_interval);
+  if (histo_intervalError) {
+    return histo_intervalError;
   }
 
   /**
@@ -275,6 +292,21 @@ function jsonToESQuery(parsedJSON, queryType, aggregationType = null, aggregatio
             size: size
           };
       }
+      else if(aggregationType === 'histogram')
+      {
+          return {
+            query: esQuery,
+            aggs: {
+              agg_name: {
+                [aggregationType]: {
+                  field: aggregationField,
+                  interval: histo_interval
+                }
+              }
+            },
+            size: size
+          };
+      }  
       else 
       {
           return {
@@ -329,9 +361,127 @@ function isAggregationAllowed(fieldName, aggregationType) {
   return true;
 }
 
+
+
+/**
+ * Parse options from the options string
+ * @param {string} optionsString - The options string
+ * @returns {object} - Parsed options
+ */
+function parseOptions(optionsString) {
+    const options = {};
+    const optionsArray = optionsString.split(',').map(option => option.trim());
+
+    for (const option of optionsArray) {
+    
+      if(validateOptions(option)){
+
+        
+        const [key, value] = option.split('=').map(item => item.trim());
+        
+        if(!(key === null || key === '' || value === null || value === '' || value === undefined))
+        {
+          options[key] = value.replace(/^"|"$/g, ''); // Remove surrounding quotes if any
+        }
+        else {
+          return { errorCode: 'INVALID_OPTION', message: `Option ( ${option} ) is not valid` };
+        }
+      }
+      else {
+        return { errorCode: 'INVALID_OPTION', message: `Option ( ${option} ) is not valid` };
+      }
+
+        
+    }
+
+    return options;
+}
+
+/**
+ * Main function to process the query string
+ * @param {string} queryString - The query string
+ * @returns {object} - Filter and options parts
+ */
+function splitFilterAndOptions(queryString) {
+    const parts = queryString.split(';');
+
+    if (parts.length > 2) {
+        return { errorCode: 'INVALID_QUERY_FORMAT', message: 'Only one ";" is allowed to separate filter and options.' };
+    }
+
+    const filterPart = parts[0].trim();
+    const optionsPart = parts[1] ? parts[1].trim() : '';
+
+    // const tokens = tokenize(filterPart);
+    // const parsedQuery = parseQuery(tokens, optionsPart);
+
+    const options = optionsPart ? parseOptions(optionsPart) : {};
+
+    if(options.errorCode)
+    {
+      return options;
+    }
+
+    return {
+        filter: filterPart,
+        options: options
+    };
+}
+
+function createQuery(queryString){
+  const result = splitFilterAndOptions(queryString);
+
+  if (result.errorCode) {
+      //console.error(`Error: ${result.errorCode} - ${result.message}`);
+    return result;
+  } 
+  else {
+    
+      const tokens = tokenize(result.filter);
+      const parsedJSON = parseQuery(tokens, result.options['timeZone']);
+
+      if (parsedJSON.errorCode) {
+        // console.error(`Error Code: ${parsedJSON.errorCode}`);
+        // console.error(`Message: ${parsedJSON.message}`);
+        return parsedJSON; 
+
+      } else {
+        // console.log("Parsed JSON:");
+        // console.log(JSON.stringify(parsedJSON, null, 2));
+        
+        const esQuery = jsonToESQuery(parsedJSON, result.options);
+
+        if (esQuery.errorCode || esQuery.error) {
+          // console.error(`Error Code: ${esQuery.errorCode}`);
+          // console.error(`Message: ${esQuery.message}`);
+          
+          return { 
+            errorCode : (esQuery.errorCode) ? esQuery.errorCode : esQuery.error, 
+            message : esQuery.message
+          }
+
+        } else {
+          // console.log("Elasticsearch Query:");
+          // console.log(JSON.stringify(esQuery, null, 2));
+          
+          return { 
+            parsedJSON : parsedJSON, 
+            query : esQuery
+          }
+        }
+      }
+      //const esQuery = jsonToESQuery(result.filter, result.options);
+      //console.log('Elasticsearch Query:', JSON.stringify(esQuery, null, 2));
+  }
+
+}
+
+
 module.exports = {
   tokenize,
   parseQuery,
   jsonToESQuery,
-  isAggregationAllowed
+  isAggregationAllowed,
+  createQuery,
+  splitFilterAndOptions
 };
