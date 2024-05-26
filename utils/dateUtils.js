@@ -33,6 +33,20 @@ function parseRelativeDate(value, timeZone) {
   return baseDate.utcOffset(offset).format('YYYY-MM-DDTHH:mm:ss.SSSZ');
 }
 
+
+
+
+function validateTimeZone(timeZone) {
+  // Validate time zone
+  const timeZoneRegex = /^([+-](?:2[0-3]|[01][0-9]):[0-5][0-9])$/;
+  if (timeZone !== 'Z' && !timeZoneRegex.test(timeZone)) {
+    return { errorCode: 'INVALID_TIMEZONE_FORMAT', message: 'Time zone format should be Z or ±HH:MM' };
+  }
+  return true;
+}
+
+
+
 /**
  * Formats a date string with the specified time zone.
  * Validates the date string and time zone format.
@@ -71,5 +85,6 @@ function formatDateString(dateStr, timeZone) {
 
 module.exports = {
   parseRelativeDate,
-  formatDateString
+  formatDateString,
+  validateTimeZone
 };
