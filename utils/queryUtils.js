@@ -32,7 +32,7 @@ const aggregationFieldTypeMapping = {
   //range: ['long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float', 'date'],
   //date_range: ['date'],
   //ip_range: ['ip'],
-  //histogram: ['long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float'],
+  histogram: ['long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float'],
   date_histogram: ['date'],
   //geo_distance: ['geo_point'],
   nested: ['nested'],
@@ -50,7 +50,7 @@ const aggregationFieldTypeMapping = {
 function validateFixedInterval(interval) {
   const intervalRegex = /^(\d+)([smhdwMy])$/;
   if (!intervalRegex.test(interval)) {
-    return { errorCode: 'INVALID_FIXED_INTERVAL', message: 'Fixed interval format should be a number followed by s (seconds), m (minutes), h (hours), d (days), w (weeks), M (months), or y (years).' };
+    return { errorCode: 'INVALID_FIXED_INTERVAL', message: 'fixed_interval format should be a number followed by s (seconds), m (minutes), h (hours), d (days), w (weeks), M (months), or y (years).' };
   }
   return null;
 }
@@ -67,6 +67,25 @@ function validateSize(size) {
     return { errorCode: 'INVALID_SIZE', message: 'Size must be a positive integer.' };
   }
   return null;
+}
+
+
+function validateHistoInterval(interval) {
+  if (!Number.isInteger(interval) || interval <= 0) {
+    return { errorCode: 'INVALID_INTERVAL', message: 'Interval must be a positive integer and greater than 0.' };
+  }
+  return null;
+}
+
+function validateOptions(input) {
+  // Trim the input string to remove leading and trailing whitespace
+  const trimmedInput = input.trim();
+
+  // Define a pattern to match valid key=value pairs with spaces allowed around the equal sign
+  const validPattern = /^([a-zA-Z0-9_-]+)\s*=\s*([a-zA-Z0-9_+\-.:>" ]+)$/;
+
+  // Test the trimmed input against the pattern
+  return validPattern.test(trimmedInput);
 }
 
 /**
@@ -93,5 +112,7 @@ module.exports = {
   aggregationFieldTypeMapping,  // Export the mapping
   validateFixedInterval,
   validateSize,
-  tokenize
+  validateHistoInterval,
+  tokenize,
+  validateOptions
 };
