@@ -1,5 +1,6 @@
 
 
+
 # Elasticsearch Query Builder
 
 ## Overview
@@ -85,29 +86,32 @@ The `main.js` file serves as the main entry point for the project. It provides f
 ##### **Example Usage:**
 
 ```javascript
-const { tokenize, parseQuery, jsonToESQuery } = require('./nestedQueryParser');
-const mapping = require('./mapping.json');
 
-// Sample query string
-const queryString = 'age > 31 and gender = "male"';
-const timeZone = 'Z'; // Default time zone
-const queryType = 'search'; // Query type: search, count, or aggregation
-const aggregationType = null; // Aggregation type, e.g., 'avg', 'sum'
-const aggregationField = null; // Field for aggregation
-const fixedInterval = '1d'; // Fixed interval for date_histogram
-const size = 10; // Size of the search results
+const {createQuery } = require('./nestedQueryParser');
 
-// Tokenize the query string
-const tokens = tokenize(queryString);
+const input = 'profession.status = "active" and createDate >= "today-2d"' + // query string
+              ' ; '+ // ';' is concatenated to seperate query string and options
+              'queryType = "aggregation", '+   // options are separated by comma ','
+              'aggregationType = "date_histogram", '+
+              'aggregationField = "createDate", '+
+              'timeZone = "+05:30", '+
+              'fixed_interval = "1d", '+
+              'size = 0 '+
+              ''; 
+              
+const result = createQuery(input);
 
-// Parse the tokens into a JSON structure
-const parsedQuery = parseQuery(tokens, timeZone);
 
-// Convert the parsed JSON into an Elasticsearch query
-const esQuery = jsonToESQuery(parsedQuery, queryType, aggregationType, aggregationField, fixedInterval, size);
+if (result.errorCode) {
+  console.error(`Error Code: ${result.errorCode}`);
+  console.error(`Message: ${result.message}`);
+} else {
+  console.log("Parsed JSON:");
+  console.log(JSON.stringify(result.parsedJSON, null, 2));
+  console.log("\nElasticsearch Query:");
+  console.log(JSON.stringify(result.query, null, 2));
+}
 
-console.log('Parsed JSON:', JSON.stringify(parsedQuery, null, 2));
-console.log('Elasticsearch Query:', JSON.stringify(esQuery, null, 2));
 ```
 
 ### **console.js**
@@ -129,15 +133,19 @@ The `nestedQueryParser.js` file contains the core logic for parsing query string
 
 ##### **Key Functions:**
 
+ - **`createQuery(queryString)`**: Calls all the required functions to convert query string into Elastic query format. Developers only have to call this function in their projects.
+
+##### Other Functions
  - `tokenize(input)`: Tokenizes the input query string into individual
    tokens.
  - `parseQuery(tokens, timeZone)`: Parses the tokenized query string into
    an expression tree.
- - `jsonToESQuery(parsedJSON, queryType, aggregationType,
-   aggregationField, fixedInterval, size)`: Converts the parsed JSON
+ - `jsonToESQuery(parsedJSON, options)`: Converts the parsed JSON
    expression tree into an Elasticsearch query.
  - `isAggregationAllowed(fieldName, aggregationType)`: Checks if the
    specified aggregation type is allowed on the given field.
+
+
 
 ### **utils/dateUtils.js**
 The `dateUtils.js` file contains functions for date manipulation and validation.
@@ -301,7 +309,7 @@ Query String:
 Time Zone:
 
 ```javascript
-	const timeZone = '+05:30';
+  const timeZone = '+05:30';
 ```
 
 Resulting Elasticsearch Query:
@@ -707,6 +715,11 @@ This document provides a comprehensive list of error codes and corresponding err
 | INVALID_QUERY_TYPE       | Invalid query type                                                            |
 | MISSING_PARAMETERS       | Missing aggregation type or field                                             |
 | INVALID_SIZE             | Size must be a positive integer.                                              |
+| INVALID_INTERVAL             | Interval must be a positive integer and greater than 0.                                              |
+| INVALID_QUERY_FORMAT             | Only one ";" is allowed to separate filter and options.                                              |
+| INVALID_OPTION             | Option ( ${option} ) is not valid                                              |
+
+
 
 
 **In the table above:**
@@ -716,9 +729,67 @@ This document provides a comprehensive list of error codes and corresponding err
 - `{fieldType}` will be replaced by the type of the field.
 - `{aggregationType}` will be replaced by the type of aggregation.
 - `{fieldName}` will be replaced by the name of the field.
+- `{option}` will be replaced by the invalid option passed in the query string.
 
+## Advance Query String : Options
 
+### Options Handling
 
+The options part of the query string allows for customizing the behavior of the Elasticsearch query, such as setting the query type, aggregation type, aggregation field, time zone, fixed interval, and size. This flexibility enables fine-tuning of the queries based on specific needs.
+
+### Structure of Options
+
+The options are specified after a semicolon (`;`) in the query string. Each option is separated by a comma (`,`), and the key-value pairs are separated by an equal sign (`=`). For example:
+
+    queryType = "aggregation", aggregationType = "sum", aggregationField = "duration.queue", timeZone = "+05:30", fixed_interval = "1d", size = 100
+
+### Supported Options
+
+1.  **queryType:**
+    
+    -   Specifies the type of the query.
+    -   Possible values: `"search"`, `"aggregation"`
+    -   Default value: `"search"`
+2.  **aggregationType:**
+    
+    -   Specifies the type of aggregation to perform.
+    -   Possible values: `"sum"`, `"avg"`, `"min"`, `"max"`, `"terms"`, `"date_histogram"`, etc.
+    -   Required if `queryType` is `"aggregation"`
+3.  **aggregationField:**
+    
+    -   Specifies the field on which the aggregation is performed.
+    -   Example: `"duration.queue"`
+    -   Required if `queryType` is `"aggregation"`
+4.  **timeZone:**
+    
+    -   Specifies the time zone for date calculations.
+    -   Format: `±[hh]:[mm]` (e.g., `"+05:30"`, `"-04:00"`)
+    -   Default value: `"Z"` (UTC)
+5.  **fixed_interval:**
+    
+    -   Specifies the fixed interval for `date_histogram` aggregation.
+    -   Possible values: A number followed by `s` (seconds), `m` (minutes), `h` (hours), `d` (days), `w` (weeks), `M` (months), or `y` (years).
+    -   Example: `"1d"` (one day)
+    -   Required if `aggregationType` is `"date_histogram"`
+    -   Default value: `"1d"`
+6.  **size:**
+    
+    -   Specifies the number of results to return.
+    -   Example: `10`
+    -   Default value: `10`
+
+7.  **interval:**
+    
+    -   Specifies the  interval for `histogram` aggregation.
+    -   Required if `aggregationType` is `"histogram"`
+    -   Example: `10`
+    -   Default value: `10`
+
+### Example Query String
+
+Here’s an example of a full query string with both filter conditions and options:
+
+    'profession.status = "active" and createDate >= "today-2d"  ;  queryType = "aggregation",  aggregationType = "date_histogram",  aggregationField = "createDate",  timeZone = "+05:30",  fixed_interval = "1d",  size = 0 '
 
 ## Conclusion
 This project provides a flexible and powerful way to convert query strings into Elasticsearch queries, with support for various query types, nested fields, and date manipulations. The structure and utility functions are designed to be modular and easy to extend for additional features.
