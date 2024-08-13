@@ -19,7 +19,7 @@ indexedFields = indexed;
  * @returns {object} - The parsed expression tree.
  */
 function parseQuery(tokens, timeZone = 'Z') {
-  const logicalGates = ['and', 'or'];
+  const logicalGates = ['and', 'or', 'AND', 'OR'];
 
   const timeZoneValidate = validateTimeZone(timeZone);
           if (timeZoneValidate.errorCode) {
@@ -180,9 +180,9 @@ function jsonToESQuery(parsedJSON, options) {
   function buildQuery(condition) {
     if (condition.conditions) {
       const subQueries = condition.conditions.map(buildQuery);
-      if (condition.logicGate === 'and') {
+      if (condition.logicGate === 'and' || condition.logicGate === 'AND') {
         return { bool: { must: subQueries } };
-      } else if (condition.logicGate === 'or') {
+      } else if (condition.logicGate === 'or' || condition.logicGate === 'OR') {
         return { bool: { should: subQueries } };
       }
     } else {
