@@ -91,6 +91,15 @@ function parseQuery(tokens, timeZone = 'Z') {
           return { errorCode: 'INVALID_FIELD_TYPE', message: `Invalid field type ${fieldType} for field ${currentKey}.` };
         }
 
+        // Split the value by '/' if it contains multiple options // 14 aug 2024 // Abhimanyu Sharma
+        // Validate if '/' is used with valid operators only
+        if (currentValue.includes('/')) {
+            if (currentOperator !== '=' && currentOperator !== '!=') {
+                return { errorCode: 'INVALID_OPERATOR_FOR_VALUE', message: `Operator ${currentOperator} is not allowed with values containing '/' for field ${currentKey}.` };
+            }
+            currentValue = currentValue.split('/').map(val => val.trim()); // Split the value by '/'
+        }
+
         // Format the date value if the field type is date
         if (fieldType === 'date') {
           const formattedDate = formatDateString(currentValue, timeZone);
@@ -200,7 +209,7 @@ function jsonToESQuery(parsedJSON, options) {
                 query: {
                   bool: {
                     must_not: [{
-                      term: { [condition.field]: { value: condition.value } }
+                      terms: { [condition.field]: { value: condition.value } }
                     }]
                   }
                 }
@@ -213,7 +222,7 @@ function jsonToESQuery(parsedJSON, options) {
                 query: {
                   bool: {
                     must: [{
-                      term: { [condition.field]: { value: condition.value } }
+                      terms: { [condition.field]: { value: condition.value } }
                     }]
                   }
                 }
@@ -224,7 +233,33 @@ function jsonToESQuery(parsedJSON, options) {
           const rangeQuery = {
             [condition.field]: {}
           };
-          if (condition.operator === '>=') {
+          if (condition.operator === '=') {
+              return {
+                nested: {
+                  path: nestedPath,
+                  query: {
+                    bool: {
+                      must: [{
+                        terms: { [condition.field]: { value: condition.value } }
+                      }]
+                    }
+                  }
+                }
+              };
+          } else if (condition.operator === '!=') {
+              return {
+                nested: {
+                  path: nestedPath,
+                  query: {
+                    bool: {
+                      must_not: [{
+                        terms: { [condition.field]: { value: condition.value } }
+                      }]
+                    }
+                  }
+                } 
+              };
+          } else if (condition.operator === '>=') {
             rangeQuery[condition.field].gte = condition.value;
           } else if (condition.operator === '<=') {
             rangeQuery[condition.field].lte = condition.value;
@@ -232,7 +267,8 @@ function jsonToESQuery(parsedJSON, options) {
             rangeQuery[condition.field].gt = condition.value;
           } else if (condition.operator === '<') {
             rangeQuery[condition.field].lt = condition.value;
-          }
+          } 
+          
           return {
             nested: {
               path: nestedPath,
@@ -248,10 +284,19 @@ function jsonToESQuery(parsedJSON, options) {
         }
       } else {
         if (condition.operator === '=') {
-          return { term: { [condition.field]: { value: condition.value } } };
+          if (Array.isArray(condition.value)) {
+            return { terms: { [condition.field]: condition.value } }; // Use 'terms' when there are multiple values
+          } else {
+            return { term: { [condition.field]: { value: condition.value } } };
+          }
         } else if (condition.operator === '!=') {
-          return { bool: { must_not: { term: { [condition.field]: { value: condition.value } } } } };
-        } else if (condition.operator === '>=') {
+          if (Array.isArray(condition.value)) {
+            return { bool: { must_not: { terms: { [condition.field]: condition.value } } } }; // Use 'terms' with must_not for '!=' operator
+          } else {
+            return { bool: { must_not: { term: { [condition.field]: { value: condition.value } } } } };
+          }
+        }
+        else if (condition.operator === '>=') {
           return { range: { [condition.field]: { gte: condition.value } } };
         } else if (condition.operator === '<=') {
           return { range: { [condition.field]: { lte: condition.value } } };
