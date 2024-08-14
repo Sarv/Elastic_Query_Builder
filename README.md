@@ -1,6 +1,7 @@
 
 
 
+
 # Elasticsearch Query Builder
 
 ## Overview
@@ -227,12 +228,14 @@ The `mappingUtils.js` file contains functions for loading and processing the map
 ## Using Different Kinds of Operators
 ### Supported Operators
 
- - `=` : Equality
-- `!=` : Inequality
-- `>=` : Greater than or equal to
-- `<=` : Less than or equal to
-- `>` : Greater than
-- `<` : Less than
+ - `=`  Equality
+- `!=`  Inequality
+- `>=`  Greater than or equal to
+- `<=`  Less than or equal to
+- `>`  Greater than
+- `<`  Less than
+- `:`  This operator is used to check if a field exists in the document
+- `~` This operator is particularly useful when you need to perform size-based conditions on a specific field
 
 ### Example
 Query String:
@@ -304,8 +307,9 @@ Date fields can support various formats as values in the query string. The proje
 #### Example
 Query String:
 
+```json
     'createDate <= "now" and createDate >= "2023-10-30 11:45:00.432"'
-
+``` 
 Time Zone:
 
 ```javascript
@@ -717,7 +721,12 @@ This document provides a comprehensive list of error codes and corresponding err
 | INVALID_SIZE             | Size must be a positive integer.                                              |
 | INVALID_INTERVAL             | Interval must be a positive integer and greater than 0.                                              |
 | INVALID_QUERY_FORMAT             | Only one ";" is allowed to separate filter and options.                                              |
-| INVALID_OPTION             | Option ( ${option} ) is not valid                                              |
+| INVALID_OPTION             | Option ( `${option}` ) is not valid                                              |
+| INVALID_VALUE_FOR_OPERATOR | Operator `${currentOperator}` is not allowed with values containing '`/`' for field '`${currentKey}`' |
+||Operator `${currentOperator}` is not allowed with values other than '`true`' or '`false`' for field '`${currentKey}`'|
+| INVALID_SIZE_VALUE | The value "`${currentValue}`" cannot be converted to an integer for size comparison |
+|  |  |
+
 
 
 
@@ -790,6 +799,182 @@ The options are specified after a semicolon (`;`) in the query string. Each opti
 Here’s an example of a full query string with both filter conditions and options:
 
     'profession.status = "active" and createDate >= "today-2d"  ;  queryType = "aggregation",  aggregationType = "date_histogram",  aggregationField = "createDate",  timeZone = "+05:30",  fixed_interval = "1d",  size = 0 '
+
+
+## Handling Multiple Values with `/` Separator : `terms` instead of `term` 
+
+If you want to optimise your query and hence want to use `terms` instead of `term` then this library supports querying fields with multiple values using the `/` separator. This feature is especially useful when you need to match any of several possible values for a field.
+
+### Supported Operators
+
+- **`=` (Equals)**: Matches any of the specified values.
+- **`!=` (Not Equals)**: Excludes any of the specified values.
+
+### Example Usage
+
+```javascript
+const queryString = 'job = "teacher / doctor / scientist" or status = "active"';
+```
+
+In this example, the fieldName field will match any of the values "teacher", "doctor", or "scientist". The generated Elasticsearch query will use the `terms` query for **job** and `term` for **status**.
+
+#### Elasticsearch Query Output
+```json
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "terms": {
+            "job": ["teacher", "doctor", "scientist"]
+          }
+        },
+        {
+          "term": {
+            "status": {
+              "value": "active"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "size": 10
+}
+```
+
+
+
+#### Restrictions
+The `/` separator can only be used with the `=` and `!=` operators. If you attempt to use `/` with any other operator (e.g., >, <, >=, <=), an error will be returned.
+
+#### Error Handling
+If an invalid operator is used with the `/` separator, the system will return the following error:
+
+```json
+{
+  "errorCode": "INVALID_OPERATOR_FOR_VALUE",
+  "message": "Operator > is not allowed with values containing '/' for field age."
+}
+```
+This ensures that only valid operators are used in conjunction with multiple values.
+
+
+#### Nested Query Example
+
+```json
+person.assets = "home/shop/gold" or tax != "paid"
+```
+
+## Exists Check Using `:` Operator
+The `:` operator has been introduced to allow checking the existence of a field in your documents. This operator is specifically designed for boolean-like queries where you want to check whether a field **exists** (`true`) or **does not exist** (`false`).
+
+#### Values
+The operator accepts only `true` or `false` (case-insensitive).
+
+#### Example Usage
+
+```javascript
+const queryString = 'status : "true" or category : "false"';
+```
+
+In this example, the **status** field will be checked to see if it exists in the document. The **category** field will be checked to see if it does not exist in the document.
+
+#### Elasticsearch Query Output
+
+```json
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "exists": {
+            "field": "status"
+          }
+        },
+        {
+          "bool": {
+            "must_not": {
+              "exists": {
+                "field": "category"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "size": 10
+}
+```
+
+## **Size Query Support Using `~` Operator**
+
+The recent updates introduce the `~` operator for handling size queries in your Elasticsearch queries. This operator is particularly useful when you need to perform size-based conditions on a specific field.
+
+#### **Usage of `~` Operator:**
+
+-   **`~=`** Checks if the size of a field is equal to a specified value.
+-   **`~!=`** Checks if the size of a field is not equal to a specified value.
+-   **`~<`** Checks if the size of a field is less than a specified value.
+-   **`~<=`** Checks if the size of a field is less than or equal to a specified value.
+-   **`~>`** Checks if the size of a field is greater than a specified value.
+-   **`~>=`** Checks if the size of a field is greater than or equal to a specified value.
+
+
+### Examples
+
+1.  **Simple Size Query**:
+ ```json 
+ `fieldName ~= "5"`
+ ```
+ This will generate a query to check if the size of the fieldName is exactly 5.
+##### Output:
+
+```json
+{
+  "script": {
+    "script": {
+      "source": "doc['fieldName'].size() == params.size",
+      "params": {
+        "size": 5
+      }
+    }
+  }
+}
+```
+
+2.  **Size Not Equal Query**:
+```json 
+ `fieldName ~!= "10"`
+ ```
+ This will generate a query to check if the size of the `fieldName` is not `10`.
+ ##### Output:
+```json
+{
+  "script": {
+    "script": {
+      "source": "doc['fieldName'].size() != params.size",
+      "params": {
+        "size": 10
+      }
+    }
+  }
+}
+```
+3.  **Other Examples**:
+```json 
+ `nested.field ~>= "3"`
+ ```
+```json 
+ `fieldName ~<= "5"`
+ ```
+
+#### **Validation:**
+
+-   The `~` operator expects a numeric value as the size. If the value provided cannot be converted to an integer, an error will be returned with an appropriate error code and message (`INVALID_SIZE_VALUE`).
+-   Only valid operators combined with `~` (like `~=`, `~!=`, etc.) are allowed. Using an invalid combination will result in an error.
+
 
 ## Conclusion
 This project provides a flexible and powerful way to convert query strings into Elasticsearch queries, with support for various query types, nested fields, and date manipulations. The structure and utility functions are designed to be modular and easy to extend for additional features.
