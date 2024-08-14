@@ -307,7 +307,7 @@ Date fields can support various formats as values in the query string. The proje
 #### Example
 Query String:
 
-```json
+```javascript
     'createDate <= "now" and createDate >= "2023-10-30 11:45:00.432"'
 ``` 
 Time Zone:
@@ -862,8 +862,8 @@ This ensures that only valid operators are used in conjunction with multiple val
 
 #### Nested Query Example
 
-```json
-person.assets = "home/shop/gold" or tax != "paid"
+```javascript
+'person.assets = "home/shop/gold" or tax != "paid"'
 ```
 
 ## Exists Check Using `:` Operator
