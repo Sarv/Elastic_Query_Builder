@@ -45,22 +45,27 @@ function parseQuery(tokens, timeZone = 'Z') {
 
       if (logicalGates.includes(token)) {
         expression.logicGate = token; // Set the logic gate for the current expression
-      } else if (token === '(') {
+      } 
+      else if (token === '(') {
         const nestedExpression = parseExpression(tokens);
         if (nestedExpression.errorCode) {
           return nestedExpression; // Return error if any from nested expression
         }
         expression.conditions.push(nestedExpression);
-      } else if (token === ')') {
+      } 
+      else if (token === ')') {
         return expression; // End of the current nested expression
-      } else if (fields[token]) {
+      } 
+      else if (fields[token]) {
         currentKey = token; // Set the current field key
-      } else if (validOperators.includes(token)) {
+      } 
+      else if (validOperators.includes(token)) {
         if (!currentKey) {
           return { errorCode: 'MISSING_FIELD', message: `Field is missing before operator ${token}.` };
         }
         currentOperator = token; // Set the current operator
-      } else {
+      } 
+      else {
         if (!currentKey) {
           return { errorCode: 'INVALID_FIELD', message: `Invalid field ${token} found.` };
         }
@@ -95,9 +100,14 @@ function parseQuery(tokens, timeZone = 'Z') {
         // Validate if '/' is used with valid operators only
         if (currentValue.includes('/')) {
             if (currentOperator !== '=' && currentOperator !== '!=') {
-                return { errorCode: 'INVALID_OPERATOR_FOR_VALUE', message: `Operator ${currentOperator} is not allowed with values containing '/' for field ${currentKey}.` };
+                return { errorCode: 'INVALID_VALUE_FOR_OPERATOR', message: `Operator ${currentOperator} is not allowed with values containing '/' for field '${currentKey}'.` };
             }
             currentValue = currentValue.split('/').map(val => val.trim()); // Split the value by '/'
+        }
+
+        // check for valid value for : operator, "true" and "false" // 14 Aug 2024 Abhimanyu Sharma
+        if (currentOperator == ':' && ((currentValue.toLowerCase() =="true" || currentValue.toLowerCase() =="false")==false)) {
+          return { errorCode: 'INVALID_VALUE_FOR_OPERATOR', message: `Operator ${currentOperator} is not allowed with values other than 'true' or 'false' for field '${currentKey}'.` };
         }
 
         // Format the date value if the field type is date
@@ -196,7 +206,10 @@ function jsonToESQuery(parsedJSON, options) {
       }
     } else {
       const pathParts = condition.field.split('.');
-      if (pathParts.length > 1) {
+      
+      // nested fields
+      if (pathParts.length > 1) 
+      {
         const nestedPath = pathParts.slice(0, -1).join('.');
         const fieldName = pathParts[pathParts.length - 1];
         const fieldType = fields[condition.field];
@@ -215,7 +228,42 @@ function jsonToESQuery(parsedJSON, options) {
                 }
               }
             };
-          } else {
+          } 
+          else if (condition.operator === ':') {
+            if(condition.value.toLowerCase()==="true")
+            {
+              return {
+                nested: {
+                  path: nestedPath,
+                  query: {
+                    bool: {
+                      must: [{
+                        exists: { "field":  condition.field }
+                      }]
+                    }
+                  }
+                }
+              };
+              
+            }
+            else if(condition.value.toLowerCase()=="false")
+            {
+              return {
+                nested: {
+                  path: nestedPath,
+                  query: {
+                    bool: {
+                      must_not: [{
+                        exists: { "field":  condition.field }
+                      }]
+                    }
+                  }
+                }
+              };
+              
+            }  
+          }
+          else {
             return {
               nested: {
                 path: nestedPath,
@@ -259,7 +307,43 @@ function jsonToESQuery(parsedJSON, options) {
                   }
                 } 
               };
-          } else if (condition.operator === '>=') {
+          } 
+          else if (condition.operator === ':') {
+            if(condition.value.toLowerCase()=="true")
+            {
+              return {
+                nested: {
+                  path: nestedPath,
+                  query: {
+                    bool: {
+                      must: [{
+                        exists: { "field":  condition.field }
+                      }]
+                    }
+                  }
+                }
+              };
+              
+            }
+            else if(condition.value.toLowerCase()=="false")
+            {
+              return {
+                nested: {
+                  path: nestedPath,
+                  query: {
+                    bool: {
+                      must_not: [{
+                        exists: { "field":  condition.field }
+                      }]
+                    }
+                  }
+                }
+              };
+              
+            }  
+          }
+
+          else if (condition.operator === '>=') {
             rangeQuery[condition.field].gte = condition.value;
           } else if (condition.operator === '<=') {
             rangeQuery[condition.field].lte = condition.value;
@@ -282,7 +366,10 @@ function jsonToESQuery(parsedJSON, options) {
             }
           };
         }
-      } else {
+      } 
+      
+      // non nested fields
+      else {
         if (condition.operator === '=') {
           if (Array.isArray(condition.value)) {
             return { terms: { [condition.field]: condition.value } }; // Use 'terms' when there are multiple values
@@ -304,6 +391,17 @@ function jsonToESQuery(parsedJSON, options) {
           return { range: { [condition.field]: { gt: condition.value } } };
         } else if (condition.operator === '<') {
           return { range: { [condition.field]: { lt: condition.value } } };
+        }
+        else if (condition.operator === ':') {
+          if(condition.value.toLowerCase()=="true")
+          {
+            return { exists: { "field":  condition.field } };
+          }
+          else if(condition.value.toLowerCase()=="false")
+          {
+            return { bool: { must_not: { exists: { "field":  condition.field } } } };
+          }
+          
         }
       }
     }
