@@ -1,18 +1,18 @@
 // Define valid operators and field types for Elasticsearch queries
-const validOperators = ['=', '!=', '>=', '<=', '>', '<', ':']; // * is for checking field exists or not. fieldName : "true" ...  fieldName : "false"
+const validOperators = ['=', '!=', '>=', '<=', '>', '<', ':', '~']; // * is for checking field exists or not. fieldName : "true" ...  fieldName : "false"
 const fieldTypes = {
-  keyword: ['=', '!=', ':'],
-  text: ['=', '!=', ':'],
-  long: ['>=', '<=', '=', '!=', '>', '<', ':'],
-  integer: ['>=', '<=', '=', '!=', '>', '<', ':'],
-  short: ['>=', '<=', '=', '!=', '>', '<', ':'],
-  byte: ['>=', '<=', '=', '!=', '>', '<', ':'],
-  double: ['>=', '<=', '=', '!=', '>', '<', ':'],
-  float: ['>=', '<=', '=', '!=', '>', '<', ':'],
-  half_float: ['>=', '<=', '=', '!=', '>', '<', ':'],
-  scaled_float: ['>=', '<=', '=', '!=', '>', '<', ':'],
-  date: ['>=', '<=', '=', '!=', '>', '<', ':'],
-  boolean: ['=', '!=', ':']
+  keyword: ['=', '!=', ':', '~'],
+  text: ['=', '!=', ':', '~'],
+  long: ['>=', '<=', '=', '!=', '>', '<', ':', '~'],
+  integer: ['>=', '<=', '=', '!=', '>', '<', ':', '~'],
+  short: ['>=', '<=', '=', '!=', '>', '<', ':', '~'],
+  byte: ['>=', '<=', '=', '!=', '>', '<', ':', '~'],
+  double: ['>=', '<=', '=', '!=', '>', '<', ':', '~'],
+  float: ['>=', '<=', '=', '!=', '>', '<', ':', '~'],
+  half_float: ['>=', '<=', '=', '!=', '>', '<', ':', '~'],
+  scaled_float: ['>=', '<=', '=', '!=', '>', '<', ':', '~'],
+  date: ['>=', '<=', '=', '!=', '>', '<', ':', '~'],
+  boolean: ['=', '!=', ':', '~']
 };
 
 
@@ -97,7 +97,8 @@ function validateOptions(input) {
  */
 function tokenize(input) {
   const tokens = [];
-  const regex = /(\w+(\.\w+)*|:|>=|<=|!=|=|>|<|and|or|\(|\)|"[^"]*"|\d+)/g;
+  const regex = /(\w+(\.\w+)*|~(?:!=|>=|<=|>|<|=)?|:|>=|<=|!=|=|>|<|and|or|\(|\)|"[^"]*"|\d+)/g;
+  
   let match;
 
   while ((match = regex.exec(input)) !== null) {
@@ -105,6 +106,41 @@ function tokenize(input) {
   }
   return tokens;
 }
+
+function isValidOperator(operator) {
+  // Check if the operator is one of the basic valid operators
+  if (validOperators.includes(operator)) {
+    return true;
+  }
+
+  // Check for valid ~ combinations (like ~=, ~!=, ~<=, ~>=, ~<, ~>)
+  const sizeOperatorMatch = operator.match(/^~(=|!=|<=|>=|<|>)$/);
+  if (sizeOperatorMatch) {
+    return true;
+  }
+
+  // If the operator does not match any valid pattern, return false
+  return false;
+}
+
+
+// Helper function to check if an operator is valid for a given field type
+function isValidOperatorForFieldType(fieldType, operator) {
+  // Check if the operator is directly in the list for the field type
+  if (fieldTypes[fieldType].includes(operator)) {
+      return true;
+  }
+
+  // Dynamically check for ~ combinations (e.g., ~=, ~!=, ~<=, ~>=, ~<, ~>)
+  const sizeOperatorMatch = operator.match(/^~(=|!=|<=|>=|<|>)$/);
+  if (sizeOperatorMatch && fieldTypes[fieldType].includes('~')) {
+      return true;
+  }
+
+  // Return false if no valid operator is found
+  return false;
+}
+
 
 module.exports = {
   validOperators,
@@ -114,5 +150,7 @@ module.exports = {
   validateSize,
   validateHistoInterval,
   tokenize,
-  validateOptions
+  validateOptions,
+  isValidOperator,
+  isValidOperatorForFieldType
 };
