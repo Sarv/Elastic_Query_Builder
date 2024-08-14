@@ -925,8 +925,8 @@ The recent updates introduce the `~` operator for handling size queries in your 
 ### Examples
 
 1.  **Simple Size Query**:
- ```json 
- `fieldName ~= "5"`
+ ```javascript 
+ 'fieldName ~= "5"'
  ```
  This will generate a query to check if the size of the fieldName is exactly 5.
 ##### Output:
@@ -945,8 +945,8 @@ The recent updates introduce the `~` operator for handling size queries in your 
 ```
 
 2.  **Size Not Equal Query**:
-```json 
- `fieldName ~!= "10"`
+```javascript 
+ 'fieldName ~!= "10"'
  ```
  This will generate a query to check if the size of the `fieldName` is not `10`.
  ##### Output:
@@ -963,11 +963,11 @@ The recent updates introduce the `~` operator for handling size queries in your 
 }
 ```
 3.  **Other Examples**:
-```json 
- `nested.field ~>= "3"`
+```javascript 
+ 'nested.field ~>= "3"'
  ```
-```json 
- `fieldName ~<= "5"`
+```javascript 
+ 'fieldName ~<= "5"'
  ```
 
 #### **Validation:**
