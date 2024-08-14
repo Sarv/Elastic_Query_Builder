@@ -1,5 +1,5 @@
 const { parseRelativeDate, formatDateString, validateTimeZone } = require('./utils/dateUtils');
-const { validOperators, fieldTypes, validateFixedInterval, validateSize,validateHistoInterval,  tokenize, aggregationFieldTypeMapping, validateOptions } = require('./utils/queryUtils');
+const { validOperators, fieldTypes, validateFixedInterval, validateSize,validateHistoInterval,  tokenize, aggregationFieldTypeMapping, validateOptions, isValidOperator, isValidOperatorForFieldType } = require('./utils/queryUtils');
 const { loadMapping } = require('./utils/mappingUtils');
 
 // Load the fields and indexed fields from the mapping
@@ -59,12 +59,21 @@ function parseQuery(tokens, timeZone = 'Z') {
       else if (fields[token]) {
         currentKey = token; // Set the current field key
       } 
-      else if (validOperators.includes(token)) {
+      else if (isValidOperator(token)) {
         if (!currentKey) {
           return { errorCode: 'MISSING_FIELD', message: `Field is missing before operator ${token}.` };
         }
-        currentOperator = token; // Set the current operator
+        if(token === '~') { // checking for size operator ~
+          currentOperator = '~='; // Set the size operator with default =
+        }
+        else{
+          currentOperator = token; // Set the current operator
+        }
+        
       } 
+
+      
+    
       else {
         if (!currentKey) {
           return { errorCode: 'INVALID_FIELD', message: `Invalid field ${token} found.` };
@@ -87,7 +96,7 @@ function parseQuery(tokens, timeZone = 'Z') {
         }
 
         // Check if the operator is valid
-        if (!validOperators.includes(currentOperator)) {
+        if (!isValidOperator(currentOperator)) {
           return { errorCode: 'INVALID_OPERATOR', message: 'Invalid operator found.' };
         }
 
@@ -110,6 +119,24 @@ function parseQuery(tokens, timeZone = 'Z') {
           return { errorCode: 'INVALID_VALUE_FOR_OPERATOR', message: `Operator ${currentOperator} is not allowed with values other than 'true' or 'false' for field '${currentKey}'.` };
         }
 
+        // check for valid value for size operator ~ script query. value must be integer only // 14 Aug 2024 Abhimanyu Sharma
+        if(currentOperator.startsWith('~'))
+        {
+          // Convert currentValue to an integer
+          const sizeValue = parseInt(currentValue, 10);
+
+          // Check if the conversion to integer was successful
+          if (isNaN(sizeValue)) {
+              return {
+                  errorCode: 'INVALID_SIZE_VALUE',
+                  message: `The value "${currentValue}" cannot be converted to an integer for size comparison.`
+              };
+          }
+          currentValue = sizeValue;
+        }
+        
+        
+
         // Format the date value if the field type is date
         if (fieldType === 'date') {
           const formattedDate = formatDateString(currentValue, timeZone);
@@ -120,7 +147,7 @@ function parseQuery(tokens, timeZone = 'Z') {
         }
 
         // Check if the operator is allowed for the field type
-        if (fieldTypes[fieldType].includes(currentOperator)) {
+        if (isValidOperatorForFieldType(fieldType,currentOperator)) {
           const condition = {
             field: currentKey,
             operator: currentOperator,
@@ -214,158 +241,149 @@ function jsonToESQuery(parsedJSON, options) {
         const fieldName = pathParts[pathParts.length - 1];
         const fieldType = fields[condition.field];
 
-        if (fieldType === 'keyword' || fieldType === 'text') {
+        if (fieldType === 'keyword' || fieldType === 'text') 
+        {
+          let queryObject;
+      
           if (condition.operator === '!=') {
-            return {
-              nested: {
-                path: nestedPath,
-                query: {
-                  bool: {
-                    must_not: [{
-                      terms: { [condition.field]: { value: condition.value } }
-                    }]
-                  }
-                }
-              }
-            };
-          } 
-          else if (condition.operator === ':') {
-            if(condition.value.toLowerCase()==="true")
-            {
-              return {
-                nested: {
-                  path: nestedPath,
-                  query: {
-                    bool: {
-                      must: [{
-                        exists: { "field":  condition.field }
-                      }]
-                    }
-                  }
-                }
-              };
-              
+            if (Array.isArray(condition.value)) {
+              queryObject = { must_not: [{ terms: { [condition.field]: condition.value } }] };
             }
-            else if(condition.value.toLowerCase()=="false")
-            {
-              return {
-                nested: {
-                  path: nestedPath,
-                  query: {
-                    bool: {
-                      must_not: [{
-                        exists: { "field":  condition.field }
-                      }]
-                    }
-                  }
-                }
-              };
-              
-            }  
-          }
-          else {
-            return {
-              nested: {
-                path: nestedPath,
-                query: {
-                  bool: {
-                    must: [{
-                      terms: { [condition.field]: { value: condition.value } }
-                    }]
-                  }
-                }
-              }
-            };
-          }
-        } else if (fieldType === 'date' || fieldType === 'long' || fieldType === 'integer' || fieldType === 'short' || fieldType === 'byte' || fieldType === 'double' || fieldType === 'float' || fieldType === 'half_float' || fieldType === 'scaled_float') {
-          const rangeQuery = {
-            [condition.field]: {}
-          };
-          if (condition.operator === '=') {
-              return {
-                nested: {
-                  path: nestedPath,
-                  query: {
-                    bool: {
-                      must: [{
-                        terms: { [condition.field]: { value: condition.value } }
-                      }]
-                    }
-                  }
-                }
-              };
-          } else if (condition.operator === '!=') {
-              return {
-                nested: {
-                  path: nestedPath,
-                  query: {
-                    bool: {
-                      must_not: [{
-                        terms: { [condition.field]: { value: condition.value } }
-                      }]
-                    }
-                  }
-                } 
-              };
-          } 
-          else if (condition.operator === ':') {
-            if(condition.value.toLowerCase()=="true")
-            {
-              return {
-                nested: {
-                  path: nestedPath,
-                  query: {
-                    bool: {
-                      must: [{
-                        exists: { "field":  condition.field }
-                      }]
-                    }
-                  }
-                }
-              };
-              
+            else {
+              queryObject = { must_not: [{ term: { [condition.field]: { value: condition.value } } }] };
             }
-            else if(condition.value.toLowerCase()=="false")
-            {
-              return {
-                nested: {
-                  path: nestedPath,
-                  query: {
-                    bool: {
-                      must_not: [{
-                        exists: { "field":  condition.field }
-                      }]
-                    }
-                  }
-                }
-              };
+
               
-            }  
+          } else if (condition.operator === ':') {
+              if (condition.value.toLowerCase() === "true") {
+                  queryObject = {
+                      must: [{
+                          exists: { field: condition.field }
+                      }]
+                  };
+              } else if (condition.value.toLowerCase() === "false") {
+                  queryObject = {
+                      must_not: [{
+                          exists: { field: condition.field }
+                      }]
+                  };
+              }
+          } 
+
+
+          // query for size operator
+          else if (condition.operator.startsWith('~')) {
+            const operator = condition.operator.slice(1); // Extract operator after ~
+        
+            // Define valid operators for size queries and map them to script symbols
+            const operatorMapping = {
+                '=': '==',
+                '!=': '!=',
+                '>': '>',
+                '>=': '>=',
+                '<': '<',
+                '<=': '<='
+            };
+
+            const scriptSource = `doc['${condition.field}'].size() ${operatorMapping[operator]} params.size`;
+        
+            queryObject = { must : [ { script: { script: { source: scriptSource, params: { size: condition.value } } } } ] };
+
+
           }
 
-          else if (condition.operator === '>=') {
-            rangeQuery[condition.field].gte = condition.value;
-          } else if (condition.operator === '<=') {
-            rangeQuery[condition.field].lte = condition.value;
-          } else if (condition.operator === '>') {
-            rangeQuery[condition.field].gt = condition.value;
-          } else if (condition.operator === '<') {
-            rangeQuery[condition.field].lt = condition.value;
-          } 
           
-          return {
-            nested: {
-              path: nestedPath,
-              query: {
-                bool: {
-                  must: [{
-                    range: rangeQuery
-                  }]
-                }
-              }
+          else {
+            if (Array.isArray(condition.value)) {
+              queryObject = { must: [{ terms: { [condition.field]: condition.value } }] };
             }
+            else {
+              queryObject = { must: [{ term: { [condition.field]: { value: condition.value } } }] };
+            } 
+          }
+      
+          return {
+              nested: {
+                  path: nestedPath,
+                  query: {
+                      bool: queryObject
+                  }
+              }
           };
         }
+      
+        
+        else if (['date', 'long', 'integer', 'short', 'byte', 'double', 'float', 'half_float', 'scaled_float'].includes(fieldType)) {
+          const rangeQuery = { [condition.field]: {} };
+          let queryObject;
+      
+          if (condition.operator === '=') {
+            if (Array.isArray(condition.value)) {
+              queryObject = { must: [{ terms: { [condition.field]: condition.value } }] };
+            }
+            else {
+              queryObject = {must: [{ term: { [condition.field]: { value: condition.value } } }] };
+            }
+              
+          } 
+          else if (condition.operator === '!=') {
+            if (Array.isArray(condition.value)) {
+              queryObject = { must_not: [{ terms: { [condition.field]: condition.value } }] };
+            }
+
+            else {
+              queryObject = { must_not: [{ term: { [condition.field]: { value: condition.value } } }] };
+            }
+              
+          } else if (condition.operator === ':') {
+              if (condition.value.toLowerCase() === "true") {
+                  queryObject = { must: [{ exists: { field: condition.field } }] };
+              } else if (condition.value.toLowerCase() === "false") {
+                  queryObject = { must_not: [{ exists: { field: condition.field } }] };
+              }
+          } else if (['>=', '<=', '>', '<'].includes(condition.operator)) {
+              // Map the operator to Elasticsearch range query keys
+              const rangeMapping = { '>=': 'gte', '<=': 'lte', '>': 'gt', '<': 'lt' };
+              rangeQuery[condition.field][rangeMapping[condition.operator]] = condition.value;
+      
+              queryObject = {
+                  must: [{
+                      range: rangeQuery
+                  }]
+              };
+          }
+
+          // query for size operator
+          else if (condition.operator.startsWith('~')) {
+            const operator = condition.operator.slice(1); // Extract operator after ~
+        
+            // Define valid operators for size queries and map them to script symbols
+            const operatorMapping = {
+                '=': '==',
+                '!=': '!=',
+                '>': '>',
+                '>=': '>=',
+                '<': '<',
+                '<=': '<='
+            };
+
+            const scriptSource = `doc['${condition.field}'].size() ${operatorMapping[operator]} params.size`;
+        
+            queryObject = { must : [ { script: { script: { source: scriptSource, params: { size: condition.value } } } } ] };
+
+            
+          }
+      
+          return {
+              nested: {
+                  path: nestedPath,
+                  query: {
+                      bool: queryObject
+                  }
+              }
+          };
+        }
+      
       } 
       
       // non nested fields
@@ -403,6 +421,34 @@ function jsonToESQuery(parsedJSON, options) {
           }
           
         }
+
+        // query for size operator
+        else if (condition.operator.startsWith('~')) {
+          const operator = condition.operator.slice(1); // Extract operator after ~
+      
+          // Define valid operators for size queries and map them to script symbols
+          const operatorMapping = {
+              '=': '==',
+              '!=': '!=',
+              '>': '>',
+              '>=': '>=',
+              '<': '<',
+              '<=': '<='
+          };
+
+          const scriptSource = `doc['${condition.field}'].size() ${operatorMapping[operator]} params.size`;
+      
+          return {
+              script: {
+                  script: {
+                      source: scriptSource,
+                      params: { size: condition.value }
+                  }
+              }
+          };
+        }
+      
+      
       }
     }
   }
