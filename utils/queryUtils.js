@@ -1,18 +1,18 @@
 // Define valid operators and field types for Elasticsearch queries
-const validOperators = ['=', '!=', '>=', '<=', '>', '<'];
+const validOperators = ['=', '!=', '>=', '<=', '>', '<', ':']; // * is for checking field exists or not. fieldName : "true" ...  fieldName : "false"
 const fieldTypes = {
-  keyword: ['=', '!='],
-  text: ['=', '!='],
-  long: ['>=', '<=', '=', '!=', '>', '<'],
-  integer: ['>=', '<=', '=', '!=', '>', '<'],
-  short: ['>=', '<=', '=', '!=', '>', '<'],
-  byte: ['>=', '<=', '=', '!=', '>', '<'],
-  double: ['>=', '<=', '=', '!=', '>', '<'],
-  float: ['>=', '<=', '=', '!=', '>', '<'],
-  half_float: ['>=', '<=', '=', '!=', '>', '<'],
-  scaled_float: ['>=', '<=', '=', '!=', '>', '<'],
-  date: ['>=', '<=', '=', '!=', '>', '<'],
-  boolean: ['=', '!=']
+  keyword: ['=', '!=', ':'],
+  text: ['=', '!=', ':'],
+  long: ['>=', '<=', '=', '!=', '>', '<', ':'],
+  integer: ['>=', '<=', '=', '!=', '>', '<', ':'],
+  short: ['>=', '<=', '=', '!=', '>', '<', ':'],
+  byte: ['>=', '<=', '=', '!=', '>', '<', ':'],
+  double: ['>=', '<=', '=', '!=', '>', '<', ':'],
+  float: ['>=', '<=', '=', '!=', '>', '<', ':'],
+  half_float: ['>=', '<=', '=', '!=', '>', '<', ':'],
+  scaled_float: ['>=', '<=', '=', '!=', '>', '<', ':'],
+  date: ['>=', '<=', '=', '!=', '>', '<', ':'],
+  boolean: ['=', '!=', ':']
 };
 
 
@@ -97,7 +97,7 @@ function validateOptions(input) {
  */
 function tokenize(input) {
   const tokens = [];
-  const regex = /(\w+(\.\w+)*|>=|<=|!=|=|>|<|and|or|\(|\)|"[^"]*"|\d+)/g;
+  const regex = /(\w+(\.\w+)*|:|>=|<=|!=|=|>|<|and|or|\(|\)|"[^"]*"|\d+)/g;
   let match;
 
   while ((match = regex.exec(input)) !== null) {
